@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Lotus Güzellik Merkezi - Randevular</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #777;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        th,
+        td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #555;
+            color: white;
+        }
+
+        tr:hover {
+            background: #f8f8f8;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+        }
+
+        .refresh {
+            display: block;
+            width: 200px;
+            margin: 0 auto 20px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #555;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .refresh:hover {
+            background: #333;
+        }
+
+        .delete-button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            background: #d9534f;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .delete-button:hover {
+            background: #b52b27;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Lotus Güzellik Merkezi</h1>
+
+    <div class="subtitle">
+        Randevu Yönetimi
+    </div>
+
+    <button
+        class="refresh"
+        onclick="loadAppointments()"
+    >
+        🔄 Randevuları Yenile
+    </button>
+
+    <div class="card">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>Tarih</th>
+
+                    <th>Saat</th>
+
+                    <th>Müşteri</th>
+
+                    <th>Telefon</th>
+
+                    <th>Hizmet</th>
+
+                    <th>Personel</th>
+
+                    <th>Süre</th>
+
+                    <th>İşlem</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="appointments">
+
+            </tbody>
+
+        </table>
+
+        <div
+            id="empty"
+            class="empty"
+            style="display:none;"
+        >
+            Henüz randevu bulunmuyor.
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+async function loadAppointments() {
+
+    const table =
+        document.getElementById("appointments");
+
+    const empty =
+        document.getElementById("empty");
+
+    table.innerHTML = "";
+
+    try {
+
+        const response =
+            await fetch("/api/appointments");
+
+        const appointments =
+            await response.json();
+
+
+        if (
+            !Array.isArray(appointments) ||
+            appointments.length === 0
+        ) {
+
+            empty.style.display = "block";
+
+            return;
+        }
+
+
+        empty.style.display = "none";
+
+
+        appointments.sort((a, b) => {
+
+            const dateA =
+                `${a.date} ${a.time}`;
+
+            const dateB =
+                `${b.date} ${b.time}`;
+
+            return dateA.localeCompare(dateB);
+
+        });
+
+
+        appointments.forEach(appointment => {
+
+            const row =
+                document.createElement("tr");
+
+
+            row.innerHTML = `
+
+                <td>
+                    ${appointment.date}
+                </td>
+
+                <td>
+                    ${appointment.time}
+                    -
+                    ${appointment.endTime || ""}
+                </td>
+
+                <td>
+                    ${appointment.name}
+                </td>
+
+                <td>
+                    ${appointment.phone}
+                </td>
+
+                <td>
+                    ${getServiceName(
+                        appointment.service
+                    )}
+                </td>
+
+                <td>
+                    ${getStaffName(
+                        appointment.staff
+                    )}
+                </td>
+
+                <td>
+                    ${appointment.duration || 30} dk
+                </td>
+
+                <td>
+
+                    <button
+                        class="delete-button"
+                        onclick="cancelAppointment(${appointment.id})"
+                    >
+                        🗑️ İptal Et
+                    </button>
+
+                </td>
+
+            `;
+
+            table.appendChild(row);
+
+        });
+
+
+    } catch (error) {
+
+        empty.style.display = "block";
+
+        empty.textContent =
+            "Randevular alınamadı.";
+
+    }
+
+}
+
+
+async function cancelAppointment(id) {
+
+    const confirmed =
+        confirm(
+            "Bu randevuyu iptal etmek istediğinize emin misiniz?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/appointments/${id}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            alert(
+                data.message ||
+                "Randevu iptal edilemedi."
+            );
+
+            return;
+        }
+
+
+        alert(
+            "Randevu başarıyla iptal edildi."
+        );
+
+
+        loadAppointments();
+
+
+    } catch (error) {
+
+        alert(
+            "Sunucuya bağlanılamadı."
+        );
+
+    }
+
+}
+
+
+function getServiceName(value) {
+
+    const names = {
+
+        "sac-kesimi":
+            "Saç Kesimi",
+
+        "fon":
+            "Fön",
+
+        "boya":
+            "Boya",
+
+        "manikur":
+            "Manikür"
+
+    };
+
+    return names[value] || value;
+
+}
+
+
+function getStaffName(value) {
+
+    const names = {
+
+        "silan":
+            "Şilan",
+
+        "serpil":
+            "Serpil",
+
+        "personel-3":
+            "Personel 3"
+
+    };
+
+    return names[value] || value;
+
+}
+
+
+loadAppointments();
+
+</script>
+
+</body>
+
+</html>
